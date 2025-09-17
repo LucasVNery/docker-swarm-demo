@@ -23,7 +23,9 @@ let MESSAGE = resolveMessage();
 
 const app = express();
 app.disable('x-powered-by');
-app.use(morgan('dev'));
+// Add hostname to logs for easy visualization in Portainer
+morgan.token('hostname', () => os.hostname());
+app.use(morgan(':date[iso] :remote-addr :method :url :status - host=:hostname - :response-time ms'));
 // Force browsers to close the connection so each request creates a new TCP connection
 // This helps Swarm alternate replicas at L4 (connection-level LB)
 app.use((_req, res, next) => {

@@ -16,7 +16,9 @@ Ambos exibem o hostname do container para mostrar o balanceamento. O frontend ch
 - Docker instalado e Docker Swarm disponível
 - Permissão administrativa para inicializar o Swarm
 
-## Iniciar o Swarm
+## Passo a Passo Completo
+
+### 1. Inicializar o Swarm
 ```bash
 # Inicializar Swarm (execute no nó manager)
 docker swarm init
@@ -25,7 +27,7 @@ docker swarm init
 # docker swarm join-token worker
 ```
 
-## Build e Deploy do Stack
+### 2. Build e Deploy do Stack
 No diretório raiz do projeto:
 ```bash
 # Build das imagens locais (o deploy do stack usa imagens já existentes)
@@ -40,34 +42,46 @@ docker stack deploy -c stack.yml swardemo
 docker stack services swardemo
 ```
 
-## Testar o Balanceamento
-- Via navegador (UI simples):
-  - Abra: `http://localhost:8080/ui`
-  - Clique em "Testar (10 requisições)" ou ative "Auto (ligar)" para ver a alternância dos hostnames do frontend e backend.
-  - Endpoints úteis (podem ser acessados diretamente):
-    - `GET /` → JSON com `hostname` do frontend e `backend.hostname`
-    - `GET /id` → JSON com `hostname` desta réplica do frontend
-    - `GET /fanout?n=10` → servidor faz N chamadas internas e retorna a lista de hostnames percorridos
-- Via CLI (curl):
+### 3. Configurar Portainer (Opcional)
+```bash
+# Criar volume para persistir dados
+docker volume create portainer_data
+
+# Criar serviço Portainer no Swarm
+docker service create --name portainer \
+  --publish 9000:9000 --publish 9443:9443 \
+  --constraint 'node.role == manager' \
+  --mount type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock \
+  --mount type=volume,src=portainer_data,dst=/data \
+  portainer/portainer-ce:latest
+```
+
+### 4. Testar o Balanceamento
+
+**Via navegador (UI simples):**
+- Abra: `http://localhost:8080/ui`
+- Clique em "Testar (10 requisições)" ou ative "Auto (ligar)" para ver a alternância dos hostnames do frontend e backend.
+
+**Via CLI (curl):**
 ```bash
 # Substitua <MANAGER_IP> se acessando remotamente
 curl http://localhost:8080/ | jq
 ```
-- Você verá alternância do `hostname` do `frontend` e, dentro do campo `backend.hostname`, alternância entre as réplicas do backend.
 
-Exemplo de resposta resumida:
-```json
-{
-  "role": "frontend",
-  "hostname": "frontend-xyz",
-  "backend": {
-    "role": "backend",
-    "hostname": "backend-abc"
-  }
-}
+**Via Portainer (logs):**
+- Acesse: `https://localhost:9443`
+- **Services** → `frontend` → **Logs** → **Follow logs**
+- Em outro terminal, gere tráfego:
+```bash
+# PowerShell
+for ($i=0; $i -lt 50; $i++) { curl http://localhost:8080/ >$null }
+
+# Linux/Mac
+for i in {1..50}; do curl http://localhost:8080/ >/dev/null; done
 ```
+- Observe nos logs: `host=<hostname>` alternando entre réplicas
 
-## Escalonar (Scaling)
+### 5. Escalonar (Scaling)
 Aumente ou reduza réplicas e observe o efeito no balanceamento:
 ```bash
 # Escalar frontend para 5 réplicas
@@ -96,18 +110,46 @@ docker service update --limit-cpu 0.10 --limit-memory 64M swardemo_backend
 Os serviços usam `update_config` com `order: start-first`, iniciando um novo container antes de encerrar o antigo.
 
 ## Portainer (visualização)
-1) Rodar Portainer (modo Swarm):
+1) Rodar Portainer como serviço do Swarm:
 ```bash
+# Criar volume para persistir dados
 docker volume create portainer_data
 
-docker run -d -p 9000:9000 -p 9443:9443 \
-  --name portainer --restart=always \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -v portainer_data:/data \
+# Criar serviço Portainer no Swarm
+docker service create --name portainer \
+  --publish 9000:9000 --publish 9443:9443 \
+  --constraint 'node.role == manager' \
+  --mount type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock \
+  --mount type=volume,src=portainer_data,dst=/data \
   portainer/portainer-ce:latest
 ```
-2) Acesse `https://<IP>:9443` ou `http://<IP>:9000`, finalize o setup e conecte no ambiente local.
-3) Visualize o stack `swardemo`, serviços, réplicas e logs.
+
+2) Acessar e configurar:
+- Abra: `https://localhost:9443` (ou `http://localhost:9000`)
+- Crie usuário admin e senha
+- Escolha "Get started" e conecte ao ambiente local (Docker/Swarm)
+
+3) Visualizar balanceamento:
+- **Stacks** → `swardemo` → veja serviços `frontend` e `backend`
+- **Services** → `frontend` → **Logs** → **Follow logs**
+- Em outro terminal, gere tráfego:
+```bash
+# PowerShell
+for ($i=0; $i -lt 50; $i++) { curl http://localhost:8080/ >$null }
+
+# Linux/Mac
+for i in {1..50}; do curl http://localhost:8080/ >/dev/null; done
+```
+- Observe nos logs: `host=<hostname>` alternando entre réplicas
+- Repita em **Services** → `backend` → **Logs** para ver chamadas internas
+
+4) Escalar via Portainer:
+- **Services** → `frontend` → **Scale** → defina 5 réplicas
+- **Services** → `backend` → **Scale** → defina 6 réplicas
+- Gere tráfego novamente e veja mais alternância
+
+5) Rede overlay:
+- **Networks** → `swardemo_app_net` → veja containers conectados
 
 ## Limpeza
 ```bash

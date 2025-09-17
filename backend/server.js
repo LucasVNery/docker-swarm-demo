@@ -21,7 +21,9 @@ let MESSAGE = resolveMessage();
 
 const app = express();
 app.disable('x-powered-by');
-app.use(morgan('dev'));
+// Add hostname to logs for easy visualization in Portainer
+morgan.token('hostname', () => os.hostname());
+app.use(morgan(':date[iso] :remote-addr :method :url :status - host=:hostname - :response-time ms'));
 
 app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok' });

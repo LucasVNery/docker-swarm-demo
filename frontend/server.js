@@ -23,11 +23,8 @@ let MESSAGE = resolveMessage();
 
 const app = express();
 app.disable('x-powered-by');
-// Add hostname to logs for easy visualization in Portainer
 morgan.token('hostname', () => os.hostname());
 app.use(morgan(':date[iso] :remote-addr :method :url :status - host=:hostname - :response-time ms'));
-// Force browsers to close the connection so each request creates a new TCP connection
-// This helps Swarm alternate replicas at L4 (connection-level LB)
 app.use((_req, res, next) => {
   res.set('Connection', 'close');
   next();
@@ -37,12 +34,10 @@ app.get('/health', (_req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
-// Simple endpoint exposing only this replica id
 app.get('/id', (_req, res) => {
   res.json({ role: 'frontend', hostname: os.hostname(), timestamp: new Date().toISOString() });
 });
 
-// Server-side fanout to demonstrate LB even from one browser request
 app.get('/fanout', async (req, res) => {
   const n = Math.min(parseInt(String(req.query.n || '10'), 10) || 10, 50);
   const results = [];
@@ -188,11 +183,8 @@ app.get('/', async (_req, res) => {
 });
 
 const server = app.listen(PORT, '0.0.0.0', () => {
-  // eslint-disable-next-line no-console
   console.log(`Frontend listening on port ${PORT}, calling ${BACKEND_URL}`);
 });
-// Disable HTTP keep-alive from server side too
-// Ensure each request is handled on a fresh connection
 server.keepAliveTimeout = 0;
 server.headersTimeout = 5000;
 

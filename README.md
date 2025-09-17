@@ -69,7 +69,7 @@ curl http://localhost:8080/ | jq
 ```
 
 **Via Portainer (logs):**
-- Acesse: `https://localhost:9443`
+- Acesse: `http://localhost:9000`
 - **Services** → `frontend` → **Logs** → **Follow logs**
 - Em outro terminal, gere tráfego:
 ```bash

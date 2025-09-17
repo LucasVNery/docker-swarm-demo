@@ -12,7 +12,6 @@ function resolveMessage() {
       const content = fs.readFileSync(messageFilePath, 'utf8').trim();
       if (content) return content;
     } catch (_e) {
-      // ignore and fallback
     }
   }
   return messageFromEnv || 'Hello from Backend';
@@ -21,7 +20,6 @@ let MESSAGE = resolveMessage();
 
 const app = express();
 app.disable('x-powered-by');
-// Add hostname to logs for easy visualization in Portainer
 morgan.token('hostname', () => os.hostname());
 app.use(morgan(':date[iso] :remote-addr :method :url :status - host=:hostname - :response-time ms'));
 
@@ -39,7 +37,6 @@ app.get('/api/info', (_req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  // eslint-disable-next-line no-console
   console.log(`Backend listening on port ${PORT}`);
 });
 

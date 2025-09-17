@@ -1,0 +1,72 @@
+version: '3.9'
+
+configs:
+  frontend_message:
+    file: ./configs/frontend_message.txt
+  backend_message:
+    file: ./configs/backend_message.txt
+
+networks:
+  app_net:
+    driver: overlay
+
+services:
+  backend:
+    image: swarm-backend:latest
+    build:
+      context: ./backend
+    networks:
+      - app_net
+    deploy:
+      replicas: 3
+      restart_policy:
+        condition: on-failure
+      update_config:
+        parallelism: 1
+        delay: 5s
+        order: start-first
+      placement:
+        constraints:
+          - node.role == manager
+    environment:
+      - PORT=3000
+      - MESSAGE_FILE=/run/configs/backend_message
+    configs:
+      - source: backend_message
+        target: /run/configs/backend_message
+        mode: 0444
+
+  frontend:
+    image: swarm-frontend:latest
+    build:
+      context: ./frontend
+    networks:
+      - app_net
+    ports:
+      - target: 8080
+        published: 8080
+        protocol: tcp
+        mode: ingress
+    deploy:
+      replicas: 3
+      restart_policy:
+        condition: on-failure
+      update_config:
+        parallelism: 1
+        delay: 5s
+        order: start-first
+      placement:
+        constraints:
+          - node.role == manager
+    environment:
+      - PORT=8080
+      - BACKEND_URL=http://backend:3000/api/info
+      - MESSAGE_FILE=/run/configs/frontend_message
+    configs:
+      - source: frontend_message
+        target: /run/configs/frontend_message
+        mode: 0444
+    depends_on:
+      - backend
+
+
